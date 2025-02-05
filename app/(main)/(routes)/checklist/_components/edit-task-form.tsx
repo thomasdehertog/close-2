@@ -161,11 +161,11 @@ function CategoryButton({
 }: { 
   icon: any;
   label: string;
-  value: Id<"categories_checklist"> | null;
+  value: string | null;
   categories: Doc<"categories_checklist">[];
-  onSelect: (value: Id<"categories_checklist"> | null) => void;
+  onSelect: (value: string | null) => void;
 }) {
-  const selectedCategory = value ? categories?.find(cat => cat._id === value) : null;
+  const selectedCategory = value ? categories?.find(cat => cat.categories_checklistId === value) : null;
   
   return (
     <div className="flex justify-between items-center py-3 px-4">
@@ -174,7 +174,7 @@ function CategoryButton({
       </div>
       <Select 
         value={value ? value : "uncategorized"} 
-        onValueChange={(val) => onSelect(val === "uncategorized" ? null : val as Id<"categories_checklist">)}
+        onValueChange={(val) => onSelect(val === "uncategorized" ? null : val)}
       >
         <SelectTrigger className="w-[200px]">
           <div className="flex items-center gap-2">
@@ -205,7 +205,7 @@ function CategoryButton({
           {categories?.map((category) => (
             <SelectItem 
               key={category._id} 
-              value={category._id}
+              value={category.categories_checklistId}
               className="cursor-pointer"
             >
               <div className="flex items-center gap-2">
@@ -246,7 +246,7 @@ export const EditTaskForm = ({
   // Initialize state with task data
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
-  const [categoryId, setCategoryId] = useState<Id<"categories_checklist"> | null>(task.categoryId as Id<"categories_checklist"> || null);
+  const [categoryId, setCategoryId] = useState<string | null>(task.categoryId || null);
   const [frequency, setFrequency] = useState<TaskFrequency>(task.frequency || "ONE_TIME");
   const [isTemplate, setIsTemplate] = useState(task.isTemplate || false);
   const [preparerId, setPreparerId] = useState(task.preparerId || null);

@@ -89,7 +89,7 @@ export const updateTask = mutation({
     id: v.id("tasks"),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
-    category: v.optional(v.string()),
+    categoryId: v.optional(v.string()),
     frequency: v.optional(v.union(v.literal("ONE_TIME"), v.literal("MONTHLY"), v.literal("QUARTERLY"), v.literal("ANNUALLY"))),
     isTemplate: v.optional(v.boolean()),
     isSubtask: v.optional(v.boolean()),
