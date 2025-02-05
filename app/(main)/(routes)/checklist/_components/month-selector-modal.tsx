@@ -13,6 +13,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { CircularProgress } from "@/components/ui/circular-progress";
 
 interface MonthSelectorModalProps {
   isOpen: boolean;
@@ -46,12 +47,44 @@ export function MonthSelectorModal({
   const periods = useQuery(api.periods.getAllPeriods, 
     workspace ? { workspaceId: workspace._id } : "skip"
   );
-  const templates = useQuery(api.tasks.getTemplates, 
-    workspace ? { workspaceId: workspace._id } : "skip"
-  );
   const createPeriod = useMutation(api.periods.createPeriod);
   const closePeriod = useMutation(api.periods.closePeriod);
-  
+
+  // Get tasks for all periods
+  const allPeriodTasks = useQuery(api.tasks.getTasks, 
+    workspace ? { 
+      workspaceId: workspace._id,
+      parentTaskId: undefined 
+    } : "skip"
+  );
+
+  const calculatePeriodCompletion = (periodId: Id<"periods">) => {
+    if (!allPeriodTasks) return 0;
+    
+    const periodTasks = allPeriodTasks.filter(task => task.periodId === periodId);
+    if (!periodTasks.length) return 0;
+    
+    const completedTasks = periodTasks.filter(task => 
+      task.status === "COMPLETED" || task.status === "SUBMITTED"
+    ).length;
+    
+    return Math.round((completedTasks / periodTasks.length) * 100);
+  };
+
+  const getMonthData = (year: number, month: number) => {
+    if (!periods) return null;
+    
+    const monthId = `${year}-${month.toString().padStart(2, '0')}`;
+    const period = periods.find(p => p.monthId === monthId);
+    
+    if (!period) return null;
+
+    return {
+      ...period,
+      completion: calculatePeriodCompletion(period._id),
+    };
+  };
+
   const years = [2024, 2023, 2022];
   
   useEffect(() => {
@@ -69,22 +102,8 @@ export function MonthSelectorModal({
     setConfirmDialogOpen(true);
   };
 
-  // Add helper function to determine which templates to include
-  const shouldIncludeTemplate = (template: any, month: number) => {
-    switch (template.frequency) {
-      case "MONTHLY":
-        return true;
-      case "QUARTERLY":
-        return month % 3 === 0; // Include in March, June, September, December
-      case "ANNUALLY":
-        return month === 12; // Include only in December
-      default:
-        return false;
-    }
-  };
-
   const handleConfirmOpen = async () => {
-    if (!workspace || !selectedMonth || !templates) return;
+    if (!workspace || !selectedMonth) return;
 
     // Validate that both checkboxes are checked
     if (!confirmChecks.templateReviewed || !confirmChecks.changesUnderstand) {
@@ -93,19 +112,11 @@ export function MonthSelectorModal({
     }
 
     try {
-      // Filter templates based on frequency and collect their IDs
-      const relevantTemplates = templates.filter(template => 
-        shouldIncludeTemplate(template, selectedMonth.month)
-      );
-      
-      const templateIds = relevantTemplates.map(template => template._id);
-
-      // Create the period with the selected template IDs
+      // Create the period
       const newPeriod = await createPeriod({
         workspaceId: workspace._id,
         year: selectedMonth.year,
         month: selectedMonth.month,
-        templateIds: templateIds,
       });
 
       if (newPeriod) {
@@ -144,47 +155,6 @@ export function MonthSelectorModal({
     }
   };
 
-  const getMonthData = (year: number, month: number) => {
-    if (!periods) return null;
-    
-    const monthId = `${year}-${month.toString().padStart(2, '0')}`;
-    return periods.find(p => p.monthId === monthId);
-  };
-
-  const months = Array.from({ length: 12 }, (_, i) => {
-    const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    const monthNum = i + 1;
-    const period = getMonthData(selectedYear, monthNum);
-    const isQuarterEnd = monthNum % 3 === 0;
-
-    return {
-      name: monthNames[i],
-      month: monthNum,
-      isQuarterEnd,
-      status: period ? "Open" : "Closed",
-      completion: 0,
-      period
-    };
-  });
-
-  // Handle click outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (modalRef.current && !modalRef.current.contains(event.target as Node) && 
-          triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isOpen, onClose, triggerRef]);
-
   const handleMonthSelect = (year: number, month: number) => {
     const formattedMonth = month.toString().padStart(2, '0');
     router.push(`/checklist?period=${year}-${formattedMonth}`);
@@ -203,6 +173,40 @@ export function MonthSelectorModal({
       }
     );
   };
+
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const monthNum = i + 1;
+    const isQuarterEnd = monthNum % 3 === 0;
+    const monthPeriod = getMonthData(selectedYear, monthNum);
+
+    return {
+      name: monthNames[i],
+      month: monthNum,
+      isQuarterEnd,
+      status: monthPeriod?.status || "CLOSED",
+      completion: monthPeriod?.completion || 0,
+      period: monthPeriod
+    };
+  });
+
+  // Handle click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (modalRef.current && !modalRef.current.contains(event.target as Node) && 
+          triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen, onClose, triggerRef]);
 
   return (
     <>
@@ -256,48 +260,64 @@ export function MonthSelectorModal({
             <div className="max-h-[600px] overflow-y-auto p-4 space-y-2">
               {months.map((monthData) => {
                 const isCurrentMonth = currentPeriod?.year === selectedYear && currentPeriod?.month === monthData.month;
+                const period = monthData.period;
+                const isOpen = period?.status === "OPEN";
+                const lastOpenPeriod = periods?.sort((a, b) => {
+                  if (a.year !== b.year) return b.year - a.year;
+                  return b.month - a.month;
+                }).find(p => p.status === "OPEN");
+                
+                const canSelect = isOpen && (!lastOpenPeriod || 
+                  (selectedYear < lastOpenPeriod.year || 
+                    (selectedYear === lastOpenPeriod.year && monthData.month <= lastOpenPeriod.month)));
                 
                 return (
                   <div
                     key={monthData.month}
-                    className={cn(
-                      "bg-white rounded-lg border hover:border-[#F08019]/30 transition-colors p-3",
-                      {
-                        "border-[#F08019] bg-[#F08019]/5": isCurrentMonth,
-                        "hover:border-[#F08019] cursor-pointer": monthData.status === "Open" && !isCurrentMonth,
-                        "opacity-75": monthData.status !== "Open",
-                      }
-                    )}
-                    onClick={() => monthData.status === "Open" && handleMonthSelect(selectedYear, monthData.month)}
+                    className={getMonthCardClassName(selectedYear, monthData.month, canSelect)}
+                    onClick={() => canSelect && handleMonthSelect(selectedYear, monthData.month)}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "text-lg font-medium",
-                            isCurrentMonth && "text-[#F08019]"
-                          )}>
-                            {monthData.name}
-                          </span>
-                          {monthData.isQuarterEnd && (
-                            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                              Quarter-End
-                            </span>
+                      <div className="flex items-center gap-4">
+                        <CircularProgress 
+                          value={monthData.completion} 
+                          size="sm"
+                          className={cn(
+                            monthData.completion === 100 
+                              ? "text-emerald-500" 
+                              : "text-[#F08019]"
                           )}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {monthData.completion}% completed
+                        />
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "text-lg font-medium",
+                              isCurrentMonth && "text-[#F08019]"
+                            )}>
+                              {monthData.name}
+                            </span>
+                            {monthData.isQuarterEnd && (
+                              <Badge variant="secondary" className="text-xs bg-muted">
+                                Quarter-End
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {monthData.completion}% completed
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {monthData.status === "Open" ? (
+                        {isOpen ? (
                           <Button
                             variant="outline"
                             size="sm"
                             className="text-sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleClosePeriod(monthData.period?._id!);
+                              if (period) {
+                                handleClosePeriod(period._id);
+                              }
                             }}
                           >
                             Close Period
@@ -312,22 +332,20 @@ export function MonthSelectorModal({
                               handleOpenPeriod(selectedYear, monthData.month);
                             }}
                           >
-                            Open Period
+                            Reopen Period
                           </Button>
                         )}
-                        <span className={cn(
-                          "text-sm px-2 py-1 rounded",
-                          monthData.status === "Open" ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"
-                        )}>
-                          {monthData.status}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
+                        <Badge 
+                          variant="outline" 
+                          className={cn(
+                            "text-xs",
+                            isOpen
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                              : "bg-muted text-muted-foreground"
+                          )}
                         >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
+                          {isOpen ? "Open" : "Closed"}
+                        </Badge>
                       </div>
                     </div>
                   </div>
