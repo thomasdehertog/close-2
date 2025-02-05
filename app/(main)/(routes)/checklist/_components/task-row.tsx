@@ -5,6 +5,9 @@ import { Badge, DatePicker } from "@/components/ui";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { UserMenu } from "./user-menu";
+import { Button } from "@/components/ui/button";
+import { useUser } from "@clerk/nextjs";
+import { toast } from "sonner";
 
 interface TaskRowProps {
   task: Doc<"tasks">;
@@ -13,6 +16,7 @@ interface TaskRowProps {
 }
 
 export function TaskRow({ task, icon, onSelect }: TaskRowProps) {
+  const { user } = useUser();
   const members = useQuery(api.workspaceMembers.getActiveMembers);
   const updateTask = useMutation(api.tasks.updateTask);
 
@@ -55,15 +59,83 @@ export function TaskRow({ task, icon, onSelect }: TaskRowProps) {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "COMPLETED":
-        return "bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30";
-      case "PENDING":
-        return "bg-blue-500/20 text-blue-700 hover:bg-blue-500/30";
-      default:
-        return "bg-gray-500/20 text-gray-700 hover:bg-gray-500/30";
+  const handleSubmitTask = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await updateTask({
+        id: task._id,
+        status: "SUBMITTED"
+      });
+      toast.success("Task submitted successfully");
+    } catch (error) {
+      console.error("Failed to submit task:", error);
+      toast.error("Failed to submit task");
     }
+  };
+
+  const getStatusDisplay = () => {
+    // Case 1: No preparer assigned
+    if (!task.preparerId) {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 px-4 text-xs bg-zinc-50 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-600 border-zinc-200"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-zinc-300" />
+            Unassigned
+          </div>
+        </Button>
+      );
+    }
+
+    // Case 2: Current user is the preparer and task is pending
+    if (task.preparerId === user?.id && task.status === "PENDING") {
+      return (
+        <Button
+          onClick={handleSubmitTask}
+          size="sm"
+          variant="outline"
+          className="h-8 px-4 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            Submit
+          </div>
+        </Button>
+      );
+    }
+
+    // Case 3: Task is submitted or completed
+    if (task.status === "SUBMITTED" || task.status === "COMPLETED") {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 px-4 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border-emerald-200"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            {task.status === "SUBMITTED" ? "Submitted" : "Completed"}
+          </div>
+        </Button>
+      );
+    }
+
+    // Case 4: Task is assigned to someone else
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8 px-4 text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 border-indigo-200"
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+          Assigned
+        </div>
+      </Button>
+    );
   };
 
   return (
@@ -96,12 +168,8 @@ export function TaskRow({ task, icon, onSelect }: TaskRowProps) {
         />
       </div>
 
-      <div className="flex justify-center">
-        <Badge 
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(task.status)}`}
-        >
-          {task.status}
-        </Badge>
+      <div className="flex justify-center items-center" onClick={(e) => e.stopPropagation()}>
+        {getStatusDisplay()}
       </div>
 
       <div className="flex justify-center items-center" onClick={(e) => e.stopPropagation()}>
