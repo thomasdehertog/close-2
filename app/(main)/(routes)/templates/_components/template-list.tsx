@@ -8,7 +8,11 @@ import {
   ChevronDown, 
   FolderIcon, 
   ChevronRight, 
-  ListTodo 
+  ListTodo,
+  CheckCircle,
+  RefreshCcw,
+  Calendar,
+  LayoutGrid
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -89,14 +93,18 @@ export const TemplateList = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "COMPLETED":
-        return "bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30";
-      case "PENDING":
-        return "bg-blue-500/20 text-blue-700 hover:bg-blue-500/30";
+  const getFrequencyIcon = (frequency: string) => {
+    switch (frequency) {
+      case "ONE_TIME":
+        return <CheckCircle className="h-3 w-3 mr-1" />;
+      case "MONTHLY":
+        return <RefreshCcw className="h-3 w-3 mr-1" />;
+      case "QUARTERLY":
+        return <LayoutGrid className="h-3 w-3 mr-1" />;
+      case "ANNUALLY":
+        return <Calendar className="h-3 w-3 mr-1" />;
       default:
-        return "bg-gray-500/20 text-gray-700 hover:bg-gray-500/30";
+        return <CheckCircle className="h-3 w-3 mr-1" />;
     }
   };
 
@@ -111,11 +119,12 @@ export const TemplateList = () => {
 
   return (
     <div className="flex flex-col border rounded-md">
-      <div className="grid grid-cols-[2fr,1fr,0.8fr,0.8fr,1fr,0.8fr] gap-2 px-4 py-3 text-sm font-medium text-muted-foreground border-b">
+      <div className="grid grid-cols-[2fr,0.8fr,0.8fr,0.8fr,0.8fr,0.8fr,0.8fr] gap-2 px-4 py-3 text-sm font-medium text-muted-foreground border-b">
         <div>Name</div>
+        <div className="text-center">Category</div>
         <div className="text-center">Preparer</div>
         <div className="text-center">Due</div>
-        <div className="text-center">Status</div>
+        <div className="text-center">Frequency</div>
         <div className="text-center">Reviewer</div>
         <div className="text-center">Due</div>
       </div>
@@ -131,8 +140,8 @@ export const TemplateList = () => {
                 index !== 0 && "border-t"
               )}
             >
-              <div className="grid grid-cols-[2fr,1fr,0.8fr,0.8fr,1fr,0.8fr] gap-2 px-4 py-3">
-                <div className="col-span-6 flex items-center gap-x-2">
+              <div className="grid grid-cols-[2fr,0.8fr,0.8fr,0.8fr,0.8fr,0.8fr,0.8fr] gap-2 px-4 py-3">
+                <div className="col-span-7 flex items-center gap-x-2">
                   {expandedCategories[categoryId] ? (
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   ) : (
@@ -153,11 +162,25 @@ export const TemplateList = () => {
                     key={template._id}
                     role="button"
                     onClick={() => setSelectedTask(template)}
-                    className="group grid grid-cols-[2fr,1fr,0.8fr,0.8fr,1fr,0.8fr] gap-2 px-4 py-3 hover:bg-muted/50 cursor-pointer"
+                    className="group grid grid-cols-[2fr,0.8fr,0.8fr,0.8fr,0.8fr,0.8fr,0.8fr] gap-2 px-4 py-3 hover:bg-muted/50 cursor-pointer"
                   >
                     <div className="flex items-center gap-x-2">
                       <ListTodo className="h-4 w-4 text-muted-foreground" />
                       <span className="truncate">{template.title}</span>
+                    </div>
+
+                    <div className="flex justify-center items-center">
+                      {template.categoryId && (
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-2 h-2 rounded-full shrink-0" 
+                            style={{ backgroundColor: getCategoryDetails(template.categoryId).color }}
+                          />
+                          <span className="text-sm truncate">
+                            {getCategoryDetails(template.categoryId).name}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex justify-center items-center" onClick={(e) => e.stopPropagation()}>
@@ -193,9 +216,14 @@ export const TemplateList = () => {
 
                     <div className="flex justify-center">
                       <Badge 
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(template.status || "PENDING")}`}
+                        className="rounded-full px-2 py-0.5 text-xs font-medium flex items-center bg-secondary text-secondary-foreground"
                       >
-                        {template.status || "PENDING"}
+                        {getFrequencyIcon(template.frequency)}
+                        {template.frequency === "ONE_TIME" ? "One Time" :
+                         template.frequency === "MONTHLY" ? "Monthly" :
+                         template.frequency === "QUARTERLY" ? "Quarterly" :
+                         template.frequency === "ANNUALLY" ? "Annually" :
+                         template.frequency}
                       </Badge>
                     </div>
 

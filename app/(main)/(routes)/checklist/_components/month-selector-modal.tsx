@@ -157,18 +157,77 @@ export function MonthSelectorModal({
 
   const handleMonthSelect = (year: number, month: number) => {
     const formattedMonth = month.toString().padStart(2, '0');
-    router.push(`/checklist?period=${year}-${formattedMonth}`);
     onClose();
+    router.push(`/checklist?period=${year}-${formattedMonth}`);
+  };
+
+  const canManagePeriod = (year: number, month: number, lastOpenPeriod: any) => {
+    if (!lastOpenPeriod) return true;
+    
+    const periodDate = new Date(year, month - 1);
+    const lastOpenDate = new Date(lastOpenPeriod.year, lastOpenPeriod.month - 1);
+    const currentDate = new Date();
+    
+    // Allow reopening past periods
+    if (periodDate < lastOpenDate) return true;
+    
+    // For future periods, only allow opening the next month after the last open period
+    if (periodDate > lastOpenDate) {
+      const nextMonth = new Date(lastOpenDate);
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      return periodDate.getTime() === nextMonth.getTime();
+    }
+    
+    return false;
+  };
+
+  const getPeriodActionButton = (period: any, isOpen: boolean, year: number, month: number, lastOpenPeriod: any) => {
+    if (isOpen) {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (period) {
+              handleClosePeriod(period._id);
+            }
+          }}
+        >
+          Close Period
+        </Button>
+      );
+    }
+
+    const periodDate = new Date(year, month - 1);
+    const lastOpenDate = lastOpenPeriod ? new Date(lastOpenPeriod.year, lastOpenPeriod.month - 1) : new Date(0);
+    const canManage = canManagePeriod(year, month, lastOpenPeriod);
+    const isPastPeriod = periodDate < lastOpenDate;
+
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="text-sm"
+        disabled={!canManage}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleOpenPeriod(year, month);
+        }}
+      >
+        {isPastPeriod ? "Reopen Period" : "Open Period"}
+      </Button>
+    );
   };
 
   const getMonthCardClassName = (year: number, month: number, isOpen: boolean) => {
     const isCurrentMonth = currentPeriod?.year === year && currentPeriod?.month === month;
     
     return cn(
-      "bg-white rounded-lg border hover:border-[#F08019]/30 transition-colors p-3",
+      "bg-white rounded-lg border hover:border-[#F08019]/30 transition-colors p-3 cursor-pointer",
       {
         "border-[#F08019] bg-[#F08019]/5": isCurrentMonth,
-        "hover:border-[#F08019] cursor-pointer": isOpen && !isCurrentMonth,
         "opacity-75": !isOpen,
       }
     );
@@ -208,6 +267,13 @@ export function MonthSelectorModal({
     }
   }, [isOpen, onClose, triggerRef]);
 
+  const handleTemplateClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const monthId = `${selectedYear}-${selectedMonth?.month.toString().padStart(2, '0')}`;
+    router.push(`/templates?from=${selectedMonth?.month && months[selectedMonth.month - 1].name}`);
+    onClose();
+  };
+
   return (
     <>
       <AnimatePresence>
@@ -244,10 +310,7 @@ export function MonthSelectorModal({
                 ))}
               </div>
               <Button
-                onClick={() => {
-                  window.location.href = "http://localhost:3001/templates";
-                  onClose();
-                }}
+                onClick={handleTemplateClick}
                 variant="outline"
                 size="sm"
                 className="ml-4"
@@ -267,15 +330,11 @@ export function MonthSelectorModal({
                   return b.month - a.month;
                 }).find(p => p.status === "OPEN");
                 
-                const canSelect = isOpen && (!lastOpenPeriod || 
-                  (selectedYear < lastOpenPeriod.year || 
-                    (selectedYear === lastOpenPeriod.year && monthData.month <= lastOpenPeriod.month)));
-                
                 return (
                   <div
                     key={monthData.month}
-                    className={getMonthCardClassName(selectedYear, monthData.month, canSelect)}
-                    onClick={() => canSelect && handleMonthSelect(selectedYear, monthData.month)}
+                    className={getMonthCardClassName(selectedYear, monthData.month, isOpen)}
+                    onClick={() => handleMonthSelect(selectedYear, monthData.month)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -308,33 +367,7 @@ export function MonthSelectorModal({
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {isOpen ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (period) {
-                                handleClosePeriod(period._id);
-                              }
-                            }}
-                          >
-                            Close Period
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenPeriod(selectedYear, monthData.month);
-                            }}
-                          >
-                            Reopen Period
-                          </Button>
-                        )}
+                        {getPeriodActionButton(period, isOpen, selectedYear, monthData.month, lastOpenPeriod)}
                         <Badge 
                           variant="outline" 
                           className={cn(

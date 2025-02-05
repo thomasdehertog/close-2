@@ -15,6 +15,7 @@ import { useState, useEffect } from "react";
 import { EditTaskForm } from "./edit-task-form";
 import { useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
+import { CircularProgress } from "@/components/ui/circular-progress";
 
 export function TaskList() {
   const { user } = useUser();
@@ -56,6 +57,14 @@ export function TaskList() {
     }
   }, [tasks]);
 
+  const calculateCompletionPercentage = (tasks: any[]) => {
+    if (!tasks || tasks.length === 0) return 0;
+    const completedTasks = tasks.filter(task => 
+      task.status === "COMPLETED" || task.status === "SUBMITTED"
+    ).length;
+    return Math.round((completedTasks / tasks.length) * 100);
+  };
+
   // Handle loading and error states after all hooks are called
   if (!workspace) {
     return <div className="flex items-center justify-center h-full">
@@ -83,6 +92,9 @@ export function TaskList() {
     acc[categoryId].push(task);
     return acc;
   }, {} as Record<string, typeof tasks>);
+
+  // Calculate overall completion percentage
+  const overallCompletion = calculateCompletionPercentage(tasks);
 
   const getCategoryDetails = (categoryId: string) => {
     if (categoryId === "uncategorized") {
@@ -131,6 +143,8 @@ export function TaskList() {
 
         {sortedCategories.map(([categoryId, categoryTasks], index) => {
           const { name, color } = getCategoryDetails(categoryId);
+          const categoryCompletion = calculateCompletionPercentage(categoryTasks);
+          
           return (
             <div key={categoryId} className="flex flex-col">
               <button
@@ -151,6 +165,20 @@ export function TaskList() {
                     <span className="text-sm font-semibold text-muted-foreground">
                       {name} ({categoryTasks.length})
                     </span>
+                    <div className="ml-2 flex items-center gap-1">
+                      <CircularProgress 
+                        value={categoryCompletion} 
+                        size="sm"
+                        className={cn(
+                          categoryCompletion === 100 
+                            ? "text-emerald-500" 
+                            : "text-[#F08019]"
+                        )}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {categoryCompletion}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               </button>
