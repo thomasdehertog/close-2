@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -19,11 +19,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function ChecklistPage() {
   const { user } = useUser();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const periodParam = searchParams.get('period');
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
@@ -48,11 +49,23 @@ export default function ChecklistPage() {
   } else if (mostRecentPeriod) {
     year = mostRecentPeriod.year;
     month = mostRecentPeriod.month;
+    // Update URL to reflect the current period
+    router.replace(`/checklist?period=${year}-${month.toString().padStart(2, '0')}`);
   } else {
     const now = new Date();
     year = now.getFullYear();
     month = now.getMonth() + 1;
   }
+
+  // Effect to handle period changes
+  useEffect(() => {
+    if (periodParam) {
+      const [newYear, newMonth] = periodParam.split('-').map(Number);
+      if (newYear !== year || newMonth !== month) {
+        router.replace(`/checklist?period=${newYear}-${newMonth.toString().padStart(2, '0')}`);
+      }
+    }
+  }, [periodParam, year, month]);
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",

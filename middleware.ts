@@ -4,11 +4,10 @@ import { NextResponse } from "next/server";
 // Separate middleware chain
 const middlewareChain = authMiddleware({
   publicRoutes: [
-    "/sign-in",
-    "/sign-up",
-    "/api/edgestore/(.*)",
-    "/preview/(.*)",
-    "/"  // Add root path as public
+    "/",
+    "/sign-up(.*)",
+    "/sign-in(.*)",
+    "/api/webhooks(.*)"
   ],
   ignoredRoutes: [
     "/api/edgestore/(.*)"
@@ -40,5 +39,5 @@ const middlewareChain = authMiddleware({
 export default middlewareChain;
 
 export const config = {
-  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/", "/(api|trpc)(.*)"],
+  matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
 }; 

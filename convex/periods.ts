@@ -71,49 +71,73 @@ export const createPeriod = mutation({
       throw new Error("Period already exists");
     }
 
-    // Create the period
-    const period = await ctx.db.insert("periods", {
-      workspaceId,
-      year,
-      month,
-      monthId,
-      period_Id: monthId,
-      quarter: Math.ceil(month / 3),
-      status: "OPEN",
-      isArchived: false,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
+    // Start a transaction for atomic period creation
+    try {
+      // Create the period
+      const period = await ctx.db.insert("periods", {
+        workspaceId,
+        year,
+        month,
+        monthId,
+        period_Id: monthId,
+        quarter: Math.ceil(month / 3),
+        status: "OPEN",
+        isArchived: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
 
-    // Get all templates for this workspace
-    const templates = await ctx.db
-      .query("tasks")
-      .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId.toString()))
-      .filter((q) => 
-        q.and(
-          q.eq(q.field("isArchived"), false),
-          q.eq(q.field("isTemplate"), true),
-          q.or(
-            q.eq(q.field("frequency"), "MONTHLY"),
-            q.eq(q.field("frequency"), "QUARTERLY"),
-            q.eq(q.field("frequency"), "ANNUALLY")
+      // Get all templates for this workspace
+      const templates = await ctx.db
+        .query("tasks")
+        .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId.toString()))
+        .filter((q) => 
+          q.and(
+            q.eq(q.field("isArchived"), false),
+            q.eq(q.field("isTemplate"), true),
+            q.or(
+              q.eq(q.field("frequency"), "MONTHLY"),
+              q.eq(q.field("frequency"), "QUARTERLY"),
+              q.eq(q.field("frequency"), "ANNUALLY")
+            )
           )
         )
-      )
-      .collect();
+        .collect();
 
-    // Filter templates based on frequency and create tasks
-    const relevantTemplates = templates.filter(template => 
-      shouldIncludeTemplate(template, month)
-    );
+      // Filter templates based on frequency and create tasks
+      const relevantTemplates = templates.filter(template => 
+        shouldIncludeTemplate(template, month)
+      );
 
-    // Clone each relevant template into a new task
-    for (const template of relevantTemplates) {
-      await cloneTemplateToTask(ctx, template, period, workspaceId);
+      // Clone each relevant template into a new task
+      const clonedTasks = await Promise.all(
+        relevantTemplates.map(async (template) => {
+          try {
+            return await cloneTemplateToTask(ctx, template, period, workspaceId);
+          } catch (error) {
+            console.error(`Failed to clone template ${template._id}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Filter out any failed clones
+      const successfulClones = clonedTasks.filter(task => task !== null);
+
+      if (successfulClones.length !== relevantTemplates.length) {
+        console.warn(`Some templates failed to clone. Expected: ${relevantTemplates.length}, Succeeded: ${successfulClones.length}`);
+      }
+
+      return {
+        period,
+        clonedTasks: successfulClones
+      };
+    } catch (error) {
+      // Log the error and rethrow
+      console.error("Failed to create period:", error);
+      throw error;
     }
-
-    return period;
-  },
+  }
 });
 
 export const getPeriod = query({

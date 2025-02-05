@@ -39,6 +39,7 @@ import { useUser } from "@clerk/nextjs";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { useSearchParams } from "next/navigation";
 
 type TaskFrequency = "ONE_TIME" | "MONTHLY" | "QUARTERLY" | "ANNUALLY";
 
@@ -325,7 +326,16 @@ export const TaskForm = ({
   onSubmit,
 }: TaskFormProps) => {
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const periodParam = searchParams.get('period');
   const workspace = useQuery(api.workspaces.getUserWorkspace);
+  const period = useQuery(api.periods.getPeriod, 
+    workspace && periodParam ? {
+      workspaceId: workspace._id,
+      year: parseInt(periodParam.split('-')[0]),
+      month: parseInt(periodParam.split('-')[1])
+    } : "skip"
+  );
   const members = useQuery(api.workspaceMembers.getActiveMembers);
   const categories = useQuery(api.checklistCategories.get, { 
     workspaceId: workspace?._id || "",
@@ -461,7 +471,7 @@ export const TaskForm = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !workspace?._id) return;
+    if (!title || !workspace?._id || (frequency === "ONE_TIME" && !period)) return;
 
     try {
       setIsLoading(true);
@@ -488,6 +498,7 @@ export const TaskForm = ({
           preparerId: preparerId || undefined,
           reviewerId: reviewerId || undefined,
           workspaceId: workspace._id,
+          periodId: frequency === "ONE_TIME" ? period._id : undefined,
           duedate_preparer: dueDatePreparer?.toISOString(),
           duedate_reviewer: dueDateReviewer?.toISOString(),
         };

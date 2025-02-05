@@ -14,14 +14,29 @@ import {
 import { useState, useEffect } from "react";
 import { EditTaskForm } from "./edit-task-form";
 import { useUser } from "@clerk/nextjs";
+import { useSearchParams } from "next/navigation";
 
 export function TaskList() {
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const periodParam = searchParams.get('period');
   const workspace = useQuery(api.workspaces.getUserWorkspace);
-  const tasks = useQuery(api.tasks.getTasks, { 
-    workspaceId: workspace?._id || "",
-    parentTaskId: undefined 
-  });
+  const period = useQuery(api.periods.getPeriod, 
+    workspace && periodParam ? {
+      workspaceId: workspace._id,
+      year: parseInt(periodParam.split('-')[0]),
+      month: parseInt(periodParam.split('-')[1])
+    } : "skip"
+  );
+  
+  const tasks = useQuery(api.tasks.getTasks, 
+    workspace && period ? { 
+      workspaceId: workspace._id,
+      periodId: period._id,
+      parentTaskId: undefined 
+    } : "skip"
+  );
+  
   const categories = useQuery(api.checklistCategories.get, {
     workspaceId: workspace?._id || "",
   });

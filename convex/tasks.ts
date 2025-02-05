@@ -35,6 +35,27 @@ export const createTask = mutation({
       throw new Error("Workspace not found");
     }
 
+    // For one-off tasks, periodId is required
+    if (args.frequency === "ONE_TIME" && !args.periodId) {
+      throw new Error("One-time tasks must be associated with a period");
+    }
+
+    // If it's a template, periodId should not be set
+    if (args.isTemplate && args.periodId) {
+      throw new Error("Template tasks should not be associated with a period");
+    }
+
+    // If periodId is provided, verify it exists and belongs to the workspace
+    if (args.periodId) {
+      const period = await ctx.db.get(args.periodId);
+      if (!period) {
+        throw new Error("Period not found");
+      }
+      if (period.workspaceId !== args.workspaceId) {
+        throw new Error("Period does not belong to the workspace");
+      }
+    }
+
     const now = Date.now();
     
     // Explicitly construct the task object with all required fields
@@ -42,7 +63,7 @@ export const createTask = mutation({
       title: args.title,
       description: args.description,
       categoryId: args.categoryId,
-      workspaceId: args.workspaceId.toString(),
+      workspaceId: args.workspaceId,
       frequency: args.frequency,
       isTemplate: args.isTemplate,
       isSubtask: args.isSubtask,
@@ -146,6 +167,7 @@ export const deleteAllTasks = mutation({
 export const getTasks = query({
   args: {
     workspaceId: v.id("workspaces"),
+    periodId: v.id("periods"),
     parentTaskId: v.optional(v.id("tasks")),
   },
   handler: async (ctx, args) => {
@@ -154,12 +176,19 @@ export const getTasks = query({
       throw new Error("Not authenticated");
     }
     
-    // Get all tasks for the workspace
+    // Get all tasks for the workspace and specific period
     return await ctx.db
       .query("tasks")
-      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
-      .filter((q) => q.eq(q.field("parentTaskId"), args.parentTaskId))
-      .filter((q) => q.eq(q.field("isArchived"), false))
+      .withIndex("by_workspace_and_period", (q) => 
+        q.eq("workspaceId", args.workspaceId.toString())
+         .eq("periodId", args.periodId)
+      )
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("parentTaskId"), args.parentTaskId),
+          q.eq(q.field("isArchived"), false)
+        )
+      )
       .order("desc")
       .collect();
   },

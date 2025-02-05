@@ -43,13 +43,15 @@ export default defineSchema({
     templateId: v.optional(v.id("templates")),
     title: v.string(),
     updatedAt: v.float64(),
-    workspaceId: v.string(),
+    workspaceId: v.id("workspaces"),
   })
   .index("by_category", ["categoryId"])
   .index("by_parent", ["parentTaskId"])
   .index("by_period", ["periodId"])
   .index("by_template", ["templateId"])
-  .index("by_workspace", ["workspaceId"]),
+  .index("by_workspace", ["workspaceId"])
+  .index("by_workspace_and_period", ["workspaceId", "periodId"])
+  .index("by_workspace_and_frequency", ["workspaceId", "frequency"]),
 
   taskHistory: defineTable({
     taskId: v.id("tasks"),
