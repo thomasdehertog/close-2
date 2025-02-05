@@ -17,11 +17,19 @@ import { Badge } from "@/components/ui/badge";
 interface MonthSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  triggerRef: React.RefObject<HTMLElement>;
-  currentPeriod?: { year: number; month: number };
+  triggerRef: React.RefObject<HTMLAnchorElement>;
+  currentPeriod: {
+    year: number;
+    month: number;
+  };
 }
 
-export function MonthSelectorModal({ isOpen, onClose, triggerRef, currentPeriod }: MonthSelectorModalProps) {
+export function MonthSelectorModal({
+  isOpen,
+  onClose,
+  triggerRef,
+  currentPeriod,
+}: MonthSelectorModalProps) {
   const [selectedYear, setSelectedYear] = useState<number>(2024);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -177,11 +185,9 @@ export function MonthSelectorModal({ isOpen, onClose, triggerRef, currentPeriod 
     }
   }, [isOpen, onClose, triggerRef]);
 
-  const handleMonthClick = (year: number, month: number, isOpen: boolean) => {
-    if (!isOpen) return; // Only allow clicking on open months
-    
-    const monthId = `${year}-${month.toString().padStart(2, '0')}`;
-    router.push(`/checklist?period=${monthId}`);
+  const handleMonthSelect = (year: number, month: number) => {
+    const formattedMonth = month.toString().padStart(2, '0');
+    router.push(`/checklist?period=${year}-${formattedMonth}`);
     onClose();
   };
 
@@ -262,7 +268,7 @@ export function MonthSelectorModal({ isOpen, onClose, triggerRef, currentPeriod 
                         "opacity-75": monthData.status !== "Open",
                       }
                     )}
-                    onClick={() => monthData.status === "Open" && handleMonthClick(selectedYear, monthData.month, true)}
+                    onClick={() => monthData.status === "Open" && handleMonthSelect(selectedYear, monthData.month)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">

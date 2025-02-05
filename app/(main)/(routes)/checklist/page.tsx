@@ -42,38 +42,52 @@ export default function ChecklistPage() {
     return bDate.getTime() - aDate.getTime();
   }).find(p => p.status === "OPEN");
 
-  // Parse period parameter or use most recent period
-  let year: number, month: number;
-  if (periodParam) {
-    [year, month] = periodParam.split('-').map(Number);
-  } else if (mostRecentPeriod) {
-    year = mostRecentPeriod.year;
-    month = mostRecentPeriod.month;
-    // Update URL to reflect the current period
-    router.replace(`/checklist?period=${year}-${month.toString().padStart(2, '0')}`);
-  } else {
-    const now = new Date();
-    year = now.getFullYear();
-    month = now.getMonth() + 1;
-  }
+  // Get current date as fallback
+  const now = new Date();
+  const defaultYear = now.getFullYear();
+  const defaultMonth = now.getMonth() + 1;
 
-  // Effect to handle period changes
+  // Initialize period state
+  const [currentPeriod, setCurrentPeriod] = useState(() => {
+    if (periodParam) {
+      const [year, month] = periodParam.split('-').map(Number);
+      return { year, month };
+    }
+    if (mostRecentPeriod) {
+      return {
+        year: mostRecentPeriod.year,
+        month: mostRecentPeriod.month
+      };
+    }
+    return {
+      year: defaultYear,
+      month: defaultMonth
+    };
+  });
+
+  // Effect to handle URL updates
+  useEffect(() => {
+    if (!periodParam && mostRecentPeriod) {
+      const newUrl = `/checklist?period=${mostRecentPeriod.year}-${mostRecentPeriod.month.toString().padStart(2, '0')}`;
+      router.replace(newUrl);
+    }
+  }, [mostRecentPeriod, periodParam]);
+
+  // Effect to handle period state updates from URL
   useEffect(() => {
     if (periodParam) {
-      const [newYear, newMonth] = periodParam.split('-').map(Number);
-      if (newYear !== year || newMonth !== month) {
-        router.replace(`/checklist?period=${newYear}-${newMonth.toString().padStart(2, '0')}`);
-      }
+      const [year, month] = periodParam.split('-').map(Number);
+      setCurrentPeriod({ year, month });
     }
-  }, [periodParam, year, month]);
+  }, [periodParam]);
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
 
-  const currentMonthName = monthNames[month - 1];
-  const currentYear = year;
+  const currentMonthName = monthNames[currentPeriod.month - 1];
+  const currentYear = currentPeriod.year;
 
   const handleMonthClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -154,7 +168,7 @@ export default function ChecklistPage() {
         isOpen={isMonthSelectorOpen}
         onClose={() => setIsMonthSelectorOpen(false)}
         triggerRef={monthTriggerRef}
-        currentPeriod={{ year, month }}
+        currentPeriod={{ year: currentPeriod.year, month: currentPeriod.month }}
       />
     </div>
   );

@@ -90,7 +90,7 @@ export const createPeriod = mutation({
       // Get all templates for this workspace
       const templates = await ctx.db
         .query("tasks")
-        .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId.toString()))
+        .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
         .filter((q) => 
           q.and(
             q.eq(q.field("isArchived"), false),

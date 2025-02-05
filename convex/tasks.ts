@@ -167,7 +167,7 @@ export const deleteAllTasks = mutation({
 export const getTasks = query({
   args: {
     workspaceId: v.id("workspaces"),
-    periodId: v.id("periods"),
+    periodId: v.optional(v.id("periods")),
     parentTaskId: v.optional(v.id("tasks")),
   },
   handler: async (ctx, args) => {
@@ -175,18 +175,27 @@ export const getTasks = query({
     if (!identity) {
       throw new Error("Not authenticated");
     }
-    
-    // Get all tasks for the workspace and specific period
-    return await ctx.db
-      .query("tasks")
-      .withIndex("by_workspace_and_period", (q) => 
-        q.eq("workspaceId", args.workspaceId.toString())
-         .eq("periodId", args.periodId)
-      )
-      .filter((q) => 
+
+    const query = args.periodId
+      ? ctx.db
+          .query("tasks")
+          .withIndex("by_workspace_and_period", (q) => 
+            q
+              .eq("workspaceId", args.workspaceId)
+              .eq("periodId", args.periodId)
+          )
+      : ctx.db
+          .query("tasks")
+          .withIndex("by_workspace", (q) => 
+            q.eq("workspaceId", args.workspaceId)
+          );
+
+    return await query
+      .filter((q) =>
         q.and(
           q.eq(q.field("parentTaskId"), args.parentTaskId),
-          q.eq(q.field("isArchived"), false)
+          q.eq(q.field("isArchived"), false),
+          q.eq(q.field("isTemplate"), false)
         )
       )
       .order("desc")

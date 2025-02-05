@@ -30,9 +30,9 @@ export function TaskList() {
   );
   
   const tasks = useQuery(api.tasks.getTasks, 
-    workspace && period ? { 
+    workspace ? { 
       workspaceId: workspace._id,
-      periodId: period._id,
+      ...(period?._id ? { periodId: period._id } : {}),
       parentTaskId: undefined 
     } : "skip"
   );
@@ -56,8 +56,23 @@ export function TaskList() {
     }
   }, [tasks]);
 
+  // Handle loading and error states after all hooks are called
+  if (!workspace) {
+    return <div className="flex items-center justify-center h-full">
+      <div className="text-muted-foreground">Loading workspace data...</div>
+    </div>;
+  }
+
+  if (periodParam && !period) {
+    return <div className="flex items-center justify-center h-full">
+      <div className="text-muted-foreground">Period not found</div>
+    </div>;
+  }
+
   if (tasks === undefined || categories === undefined) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center h-full">
+      <div className="text-muted-foreground">Loading tasks...</div>
+    </div>;
   }
 
   const tasksByCategory = tasks.reduce((acc, task) => {
